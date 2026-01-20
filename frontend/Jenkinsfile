@@ -6,6 +6,7 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout') {
       steps {
         checkout scm
@@ -14,31 +15,43 @@ pipeline {
 
     stage('SonarQube Scan') {
       steps {
-    withSonarQubeEnv('SonarQube') {
-      withCredentials([string(credentialsId: 'sonar-token2', variable: 'SONAR_TOKEN')]) {
-        sh '''
-          cd frontend
-          sonar-scanner \
-            -Dsonar.projectKey=portfolio-ui \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://localhost:9000 \
-            -Dsonar.login=$SONAR_TOKEN
-        '''
+        withSonarQubeEnv('SonarQube') {
+          withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            sh '''
+              cd frontend
+              sonar-scanner \
+                -Dsonar.projectKey=portfolio-ui \
+                -Dsonar.sources=. \
+                -Dsonar.login=$SONAR_TOKEN
+            '''
+          }
+        }
       }
     }
-  }
-    }
 
-    stage('Trivy Scan') {
+    stage('Trivy FS Scan') {
       steps {
-        sh 'trivy fs .'
-        sh 'trivy image --severity HIGH,CRITICAL --exit-code 1 $IMAGE_NAME || true'
+        sh '''
+          cd frontend
+          trivy fs .
+        '''
       }
     }
 
     stage('Build Docker Image') {
       steps {
-        sh 'docker build -t $IMAGE_NAME:latest .'
+        sh '''
+          cd frontend
+          docker build -t $IMAGE_NAME:latest .
+        '''
+      }
+    }
+
+    stage('Trivy Image Scan') {
+      steps {
+        sh '''
+          trivy image --severity HIGH,CRITICAL --exit-code 1 $IMAGE_NAME:latest || true
+        '''
       }
     }
 
